@@ -99,34 +99,20 @@ private:
         });
 
         boot_button_.OnLongPress([this]() {
-            SwitchNetworkType();
+            // SwitchNetworkType();
         });
 
-        volume_up_button_.OnClick([this]() {
+        volume_up_button_.OnPressDown([this]() {
             power_save_timer_->WakeUp();
             auto& app = Application::GetInstance();
-            if (GetNetworkType() == NetworkType::WIFI) {
-                if (app.GetDeviceState() == kDeviceStateStarting && !WifiStation::GetInstance().IsConnected()) {
-                    // cast to WifiBoard
-                    auto& wifi_board = static_cast<WifiBoard&>(GetCurrentBoard());
-                    wifi_board.ResetWifiConfiguration();
-                }
-            }
-            app.ToggleChatState();
+            app.StartListening();
         });
 
-        volume_down_button_.OnClick([this]() {
-            power_save_timer_->WakeUp();
+        volume_up_button_.OnPressUp([this]() {
             auto& app = Application::GetInstance();
-            if (GetNetworkType() == NetworkType::WIFI) {
-                if (app.GetDeviceState() == kDeviceStateStarting && !WifiStation::GetInstance().IsConnected()) {
-                    // cast to WifiBoard
-                    auto& wifi_board = static_cast<WifiBoard&>(GetCurrentBoard());
-                    wifi_board.ResetWifiConfiguration();
-                }
-            }
-            app.ToggleChatState();
+            app.StopListening();
         });
+
     }
 
     void InitializeSt7789Display() {

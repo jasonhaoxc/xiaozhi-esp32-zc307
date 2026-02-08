@@ -15,6 +15,8 @@
 #include <wifi_station.h>
 
 #include <driver/rtc_io.h>
+#include "power_save_timer.h"
+#include <driver/gpio.h>
 #include <esp_sleep.h>
 
 #define TAG "ZHENGCHEN_1_54TFT_ML307"
@@ -41,7 +43,7 @@ private:
         });
         power_manager_->OnChargingStatusChanged([this](bool is_charging) {
             if (is_charging) {
-                power_save_timer_->SetEnabled(false);
+                power_save_timer_->SetEnabled(true);
             } else {
                 power_save_timer_->SetEnabled(true);
             }
@@ -62,6 +64,12 @@ private:
             GetDisplay()->SetPowerSaveMode(false);
             GetBacklight()->RestoreBrightness();
         });
+        power_save_timer_->OnShutdownRequest([this]() {
+		    //深度睡眠之前，定义唤醒源 GPIO_NUM_0 
+            esp_sleep_enable_ext0_wakeup(GPIO_NUM_0, 0);
+            esp_deep_sleep_start();
+        });
+
         power_save_timer_->SetEnabled(true);
     }
 
@@ -96,36 +104,28 @@ private:
 
         volume_up_button_.OnClick([this]() {
             power_save_timer_->WakeUp();
-            auto codec = GetAudioCodec();
-            auto volume = codec->output_volume() + 10;
-            if (volume > 100) {
-                volume = 100;
+            auto& app = Application::GetInstance();
+            if (GetNetworkType() == NetworkType::WIFI) {
+                if (app.GetDeviceState() == kDeviceStateStarting && !WifiStation::GetInstance().IsConnected()) {
+                    // cast to WifiBoard
+                    auto& wifi_board = static_cast<WifiBoard&>(GetCurrentBoard());
+                    wifi_board.ResetWifiConfiguration();
+                }
             }
-            codec->SetOutputVolume(volume);
-            GetDisplay()->ShowNotification(Lang::Strings::VOLUME + std::to_string(volume/10));
-        });
-
-        volume_up_button_.OnLongPress([this]() {
-            power_save_timer_->WakeUp();
-            GetAudioCodec()->SetOutputVolume(100);
-            GetDisplay()->ShowNotification(Lang::Strings::MAX_VOLUME);
+            app.ToggleChatState();
         });
 
         volume_down_button_.OnClick([this]() {
             power_save_timer_->WakeUp();
-            auto codec = GetAudioCodec();
-            auto volume = codec->output_volume() - 10;
-            if (volume < 0) {
-                volume = 0;
+            auto& app = Application::GetInstance();
+            if (GetNetworkType() == NetworkType::WIFI) {
+                if (app.GetDeviceState() == kDeviceStateStarting && !WifiStation::GetInstance().IsConnected()) {
+                    // cast to WifiBoard
+                    auto& wifi_board = static_cast<WifiBoard&>(GetCurrentBoard());
+                    wifi_board.ResetWifiConfiguration();
+                }
             }
-            codec->SetOutputVolume(volume);
-            GetDisplay()->ShowNotification(Lang::Strings::VOLUME + std::to_string(volume/10));
-        });
-
-        volume_down_button_.OnLongPress([this]() {
-            power_save_timer_->WakeUp();
-            GetAudioCodec()->SetOutputVolume(0);
-            GetDisplay()->ShowNotification(Lang::Strings::MUTED);
+            app.ToggleChatState();
         });
     }
 
